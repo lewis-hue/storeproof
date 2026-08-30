@@ -1,17 +1,21 @@
 {
   "name": "storeproof",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Tells an independent artist exactly which of their songs are missing from which stores, with evidence. The list a distributor's support team cannot generate for you.",
+  "description": "Tells an independent artist exactly which of their songs are missing from which stores, with evidence. Decoupled web + Redis/BullMQ queue + async worker.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "worker": "tsx worker/index.ts",
+    "worker:dev": "tsx watch worker/index.ts",
     "lint": "next lint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "bullmq": "^5.34.5",
+    "ioredis": "^5.4.2",
     "next": "^15.1.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -22,6 +26,7 @@
     "@types/react-dom": "^19.0.2",
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.1.3",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^4.1.10"
   },

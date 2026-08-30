@@ -9,3 +9,6 @@ build/
 next-env.d.ts
 
 *.tsbuildinfo
+
+# local-only test overrides
+docker-compose.override.yml

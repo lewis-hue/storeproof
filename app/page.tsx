@@ -13,12 +13,14 @@ export default function Home() {
   const [mode, setMode] = useState<'live' | 'demo' | null>(null);
   const [report, setReport] = useState<CatalogReport | null>(null);
   const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState('');
 
   async function run() {
     setLoading(true);
     setError('');
     setReport(null);
     setCopied(false);
+    setStatus('queued');
     try {
       const titles = songsText.split('\n').map((s) => s.trim()).filter(Boolean);
       const res = await fetch('/api/verify', {
@@ -27,13 +29,30 @@ export default function Home() {
         body: JSON.stringify({ artist, titles }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Verification failed.');
-      setMode(data.mode);
-      setReport(data.report as CatalogReport);
+      if (!res.ok) throw new Error(data.error || 'Could not queue verification.');
+      const jobId = data.jobId as string;
+
+      // The web tier only enqueued the job; a worker processes it. Poll for the result so the
+      // request never blocks on the slow, rate-limited per-store searching.
+      for (let i = 0; i < 150; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const s = await fetch(`/api/verify/${jobId}`);
+        const sj = await s.json();
+        if (sj.status === 'completed') {
+          setMode(sj.mode);
+          setReport(sj.report as CatalogReport);
+          return;
+        }
+        if (sj.status === 'failed') throw new Error(sj.error || 'Verification failed.');
+        if (sj.status === 'not-found') throw new Error('The verification job expired. Please run it again.');
+        setStatus(sj.status === 'active' ? 'active' : 'queued');
+      }
+      throw new Error('Verification timed out. Please try again.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Verification failed.');
     } finally {
       setLoading(false);
+      setStatus('');
     }
   }
 
@@ -58,7 +77,7 @@ export default function Home() {
         <textarea value={songsText} onChange={(e) => setSongsText(e.target.value)} rows={5} style={{ marginTop: 4 }} />
         <div style={{ marginTop: 12 }}>
           <button className="primary" onClick={run} disabled={loading}>
-            {loading ? 'Checking every store…' : 'Verify my catalogue'}
+            {loading ? (status === 'active' ? 'Verifying across stores…' : 'Queued, waiting for a worker…') : 'Verify my catalogue'}
           </button>
         </div>
         {error ? <p className="pill missing" style={{ marginTop: 12 }}>{error}</p> : null}

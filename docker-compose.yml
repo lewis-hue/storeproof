@@ -1,0 +1,38 @@
+# The decoupled stack: a Redis-backed job queue between an independently scalable web tier and
+# worker tier. `docker compose up --build` starts all three. Open http://localhost:3000.
+# Scale the compute tier without touching the web: `docker compose up --scale worker=3`.
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # No host port: only the web and worker reach Redis, over the internal network.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  web:
+    build: .
+    command: npm start
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis:6379
+      SERPER_API_KEY: ${SERPER_API_KEY:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: npm run worker
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis:6379
+      SERPER_API_KEY: ${SERPER_API_KEY:-}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+    depends_on:
+      redis:
+        condition: service_healthy
